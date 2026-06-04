@@ -1,33 +1,60 @@
 # PowerShell Utilities
 
-A collection of useful PowerShell scripts for everyday administrative tasks. This repository is intended to serve as a personal toolbox for automating and simplifying common IT operations.
+A personal toolbox of PowerShell scripts for automating everyday IT and Azure/M365 admin tasks.
 
-## Scripts
-
-### 1. Export Azure AD Licensed Users
-
-**File:** `Export-AzureADLicensedUsers.ps1`  
-This script connects to Azure Active Directory and exports a list of licensed users to a CSV file. It maps license SKU part numbers to user-friendly license names for easier reporting.
-
-#### Features:
-- Connects to Azure AD using `Connect-AzureAD`
-- Retrieves all licensed users
-- Maps license SKU IDs to readable names
-- Outputs user and license info to a dated CSV file in `C:\Temp`
-
-#### Requirements:
-- AzureAD PowerShell module
-- Appropriate permissions to read user and license data
-
-#### Output:
-CSV file named `AzureLicenseInventory-MM-dd-yyyy.csv` saved to `C:\Temp`
+![PowerShell](https://img.shields.io/badge/PowerShell-5.1+-blue?logo=powershell)
+![License](https://img.shields.io/github/license/parzival419/PowerShell_Scripts)
 
 ---
 
-## More Scripts Coming Soon
+## Repository Structure
 
-This is the first script in what will become a growing collection of useful PowerShell tools. Stay tuned!
+```
+PowerShell_Scripts/
+├── Azure/
+│   └── user_licenses.ps1
+├── Intune/         # coming soon
+├── M365/           # coming soon
+└── README.md
+```
 
-## License
+---
 
-MIT License
+## Scripts
+
+### Azure / user_licenses.ps1
+
+Connects to Azure AD and exports a dated CSV of all licensed users. License SKU part numbers are mapped to friendly names for easy reporting.
+
+**Usage**
+```powershell
+# Install the module if needed
+Install-Module AzureAD
+
+# Run the script
+.\Azure\user_licenses.ps1
+```
+
+**Output:** `C:\Temp\AzureLicenseInventory-MM-dd-yyyy.csv`
+
+**Fields:** Name, Title, Department, Email, SKU, License, Company, Office
+
+**Licenses mapped (20+):** M365 E3, M365 F3, Office 365 E1/E3/F3, Exchange Online, Power BI Pro, Copilot for M365, Teams Premium, Visio, Project, and more
+
+**Requirements:**
+- PowerShell 5.1+
+- `AzureAD` module
+- Read permissions on Azure AD users and license SKUs
+
+---
+
+## Roadmap
+
+- [ ] Intune device compliance report
+- [ ] M365 mailbox size audit
+- [ ] Stale user account cleanup
+- [ ] Bulk license assignment from CSV
+
+---
+
+MIT License · [parzival419](https://github.com/parzival419)
