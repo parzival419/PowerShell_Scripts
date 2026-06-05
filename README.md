@@ -12,48 +12,152 @@ A personal toolbox of PowerShell scripts for automating everyday IT and Azure/M3
 ```
 PowerShell_Scripts/
 ├── Azure/
+│   ├── License_Audit.ps1
 │   └── user_licenses.ps1
-├── Intune/         # coming soon
-├── M365/           # coming soon
+├── Intune/
+│   ├── DesktopShortcut/
+│   │   ├── DesktopShortcut_Detection_Script.ps1
+│   │   └── DesktopShortcut_Remediation_Script.ps1
+│   ├── ForceRestart/
+│   │   ├── ForceRestart_Detection_Script.ps1
+│   │   └── ForceRestart_Remediation_Script.ps1
+│   ├── Net35/
+│   │   ├── NET35_Detection_Script.ps1
+│   │   └── NET35_Remediation_Script.ps1
+│   ├── SMBv1/
+│   │   ├── SMBv1_Detection_Script.ps1
+│   │   └── SMBv1_Remediation_Script.ps1
+│   └── WinTrust/
+│       ├── WinTrust_Detection_Script.ps1
+│       └── WinTrust_Remediation_Script.ps1
+├── M365/
+│   └── DistributionList_Member_Audit.ps1
+├── General/
+│   └── MSI_MSP_Cleanup.ps1
 └── README.md
 ```
 
 ---
 
-## Scripts
+## Azure
 
-### Azure / user_licenses.ps1
+### License_Audit.ps1
 
-Connects to Azure AD and exports a dated CSV of all licensed users. License SKU part numbers are mapped to friendly names for easy reporting.
+Connects to Microsoft Graph and exports a dated CSV of all licensed users with friendly license names mapped from SKU part numbers. Replaces the legacy AzureAD module approach.
 
-**Usage**
+**Requirements:** `Microsoft.Graph` module, `User.Read.All` and `Directory.Read.All` permissions
+
+**Output:** `C:\Temp\LicenseAudit-MM-dd-yyyy.csv`
+
+**Fields:** Name, Title, Department, Email, SKU, License, Company, Office
+
 ```powershell
-# Install the module if needed
-Install-Module AzureAD
-
-# Run the script
-.\Azure\user_licenses.ps1
+Install-Module Microsoft.Graph -Scope CurrentUser
+.\Azure\License_Audit.ps1
 ```
+
+### user_licenses.ps1
+
+Original version of the license audit script using the legacy AzureAD PowerShell module. Kept for reference. `License_Audit.ps1` is the recommended version as the AzureAD module has been deprecated by Microsoft.
+
+**Requirements:** `AzureAD` module, read permissions on Azure AD users and license SKUs
 
 **Output:** `C:\Temp\AzureLicenseInventory-MM-dd-yyyy.csv`
 
 **Fields:** Name, Title, Department, Email, SKU, License, Company, Office
 
-**Licenses mapped (20+):** M365 E3, M365 F3, Office 365 E1/E3/F3, Exchange Online, Power BI Pro, Copilot for M365, Teams Premium, Visio, Project, and more
-
-**Requirements:**
-- PowerShell 5.1+
-- `AzureAD` module
-- Read permissions on Azure AD users and license SKUs
+```powershell
+Install-Module AzureAD
+.\Azure\user_licenses.ps1
+```
 
 ---
 
-## Roadmap
+## Intune
 
-- [ ] Intune device compliance report
-- [ ] M365 mailbox size audit
-- [ ] Stale user account cleanup
-- [ ] Bulk license assignment from CSV
+All Intune scripts follow the detection/remediation pattern. Detection scripts exit 0 for compliant and exit 1 for non-compliant. Remediation scripts run when detection returns exit 1.
+
+### DesktopShortcut
+
+Detects and repairs a managed desktop shortcut and icon on the public desktop. Update the config block with your shortcut name, target URL, and icon URL before deploying.
+
+```
+Intune/DesktopShortcut/DesktopShortcut_Detection_Script.ps1
+Intune/DesktopShortcut/DesktopShortcut_Remediation_Script.ps1
+```
+
+### ForceRestart
+
+Detects whether device uptime exceeds 1 day. Remediation prompts the user via Windows toast notifications with up to 2 deferrals before forcing a restart countdown. Runs in user context. Update the config block with your org name and icon URL before deploying.
+
+```
+Intune/ForceRestart/ForceRestart_Detection_Script.ps1
+Intune/ForceRestart/ForceRestart_Remediation_Script.ps1
+```
+
+### Net35
+
+Detects and enables the .NET Framework 3.5 (NetFx3) Windows feature.
+
+```
+Intune/Net35/NET35_Detection_Script.ps1
+Intune/Net35/NET35_Remediation_Script.ps1
+```
+
+### SMBv1
+
+Detects and disables the SMB1Protocol Windows feature.
+
+```
+Intune/SMBv1/SMBv1_Detection_Script.ps1
+Intune/SMBv1/SMBv1_Remediation_Script.ps1
+```
+
+### WinTrust
+
+Detects and configures the `EnableCertPaddingCheck` registry key in both 32-bit and 64-bit WinTrust paths.
+
+```
+Intune/WinTrust/WinTrust_Detection_Script.ps1
+Intune/WinTrust/WinTrust_Remediation_Script.ps1
+```
+
+---
+
+## M365
+
+### DistributionList_Member_Audit.ps1
+
+Connects to Exchange Online and exports a dated CSV of all members across distribution lists matching a specified filter. Logs empty DLs for easy identification. Update the config block with your admin UPN and DL filter pattern before running.
+
+**Requirements:** `ExchangeOnlineManagement` module
+
+**Output:** `C:\Temp\DL_Member_Audit_yyyyMMdd_HHmm.csv`
+
+**Fields:** DL_DisplayName, DL_Email, DL_ManagedBy, Member_DisplayName, Member_Email, Member_Type, Member_RecipientType
+
+```powershell
+Install-Module ExchangeOnlineManagement -Scope CurrentUser
+.\M365\DistributionList_Member_Audit.ps1
+```
+
+---
+
+## General
+
+### MSI_MSP_Cleanup.ps1
+
+Removes orphaned MSI and MSP files from `C:\Windows\Installer` by cross-referencing the Windows Installer registry. Includes dry run mode -- set `$DryRun = $true` to preview deletions before committing. Must be run as Administrator.
+
+```powershell
+# Preview only
+$DryRun = $true
+.\General\MSI_MSP_Cleanup.ps1
+
+# Actual cleanup
+$DryRun = $false
+.\General\MSI_MSP_Cleanup.ps1
+```
 
 ---
 
