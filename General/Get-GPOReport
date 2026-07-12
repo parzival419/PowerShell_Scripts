@@ -1,0 +1,139 @@
+<#
+.SYNOPSIS
+    Looks up a list of GPOs by name and exports each one's settings report to XML.
+
+.DESCRIPTION
+    Reads GPO names from a text file (one name per line) or an inline array,
+    then uses Get-GPOReport (GroupPolicy module) to generate an XML report
+    for each GPO. Reports are saved individually and can optionally be
+    combined into a single XML file.
+
+.PARAMETER GpoNames
+    An array of GPO display names to look up. Use this OR -InputFile.
+
+.PARAMETER InputFile
+    Path to a text file containing one GPO name per line.
+
+.PARAMETER OutputFolder
+    Folder where individual XML reports will be saved. Defaults to .\GPOReports
+
+.PARAMETER Domain
+    Optional domain name to query. Defaults to the current domain.
+
+.PARAMETER Combine
+    If specified, also creates a single combined XML file containing all GPO reports.
+
+.EXAMPLE
+    .\Get-GPOReport.ps1 -InputFile .\gpo-list.txt -OutputFolder C:\Reports
+
+.EXAMPLE
+    .\Get-GPOReport.ps1 -GpoNames "Default Domain Policy","Password Policy" -Combine
+
+.NOTES
+    Requires the GroupPolicy PowerShell module (RSAT: Group Policy Management Tools)
+    and permission to read GPOs in the target domain.
+#>
+
+[CmdletBinding(DefaultParameterSetName = 'ByArray')]
+param(
+    [Parameter(ParameterSetName = 'ByArray')]
+    [string[]]$GpoNames,
+
+    [Parameter(ParameterSetName = 'ByFile')]
+    [string]$InputFile,
+
+    [string]$OutputFolder = ".\GPOReports",
+
+    [string]$Domain,
+
+    [switch]$Combine
+)
+
+# --- Ensure GroupPolicy module is available ---
+if (-not (Get-Module -ListAvailable -Name GroupPolicy)) {
+    Write-Error "The GroupPolicy module is not installed. Install RSAT: Group Policy Management Tools and try again."
+    exit 1
+}
+Import-Module GroupPolicy -ErrorAction Stop
+
+# --- Build the list of GPO names to process ---
+if ($PSCmdlet.ParameterSetName -eq 'ByFile') {
+    if (-not (Test-Path $InputFile)) {
+        Write-Error "Input file not found: $InputFile"
+        exit 1
+    }
+    $GpoNames = Get-Content -Path $InputFile | Where-Object { $_.Trim() -ne "" }
+}
+
+if (-not $GpoNames -or $GpoNames.Count -eq 0) {
+    Write-Error "No GPO names provided. Use -GpoNames or -InputFile."
+    exit 1
+}
+
+# --- Prepare output folder ---
+if (-not (Test-Path $OutputFolder)) {
+    New-Item -Path $OutputFolder -ItemType Directory -Force | Out-Null
+}
+
+$results = @()
+$combinedXml = New-Object System.Xml.XmlDocument
+$root = $combinedXml.CreateElement("GPOReports")
+$combinedXml.AppendChild($root) | Out-Null
+
+foreach ($name in $GpoNames) {
+    $name = $name.Trim()
+    Write-Host "Processing GPO: $name" -ForegroundColor Cyan
+
+    try {
+        $gpoParams = @{ Name = $name }
+        if ($Domain) { $gpoParams["Domain"] = $Domain }
+
+        # Confirm the GPO exists before generating a report
+        $gpo = Get-GPO @gpoParams -ErrorAction Stop
+
+        # Sanitize filename
+        $safeName = ($name -replace '[\\/:*?"<>|]', '_')
+        $outFile = Join-Path $OutputFolder "$safeName.xml"
+
+        # Generate the XML report
+        $reportParams = @{ Name = $name; ReportType = "Xml" }
+        if ($Domain) { $reportParams["Domain"] = $Domain }
+        $xmlContent = Get-GPOReport @reportParams
+
+        $xmlContent | Out-File -FilePath $outFile -Encoding utf8
+
+        Write-Host "  -> Saved: $outFile" -ForegroundColor Green
+
+        $results += [pscustomobject]@{
+            GPOName = $name
+            Status  = "Success"
+            Id      = $gpo.Id
+            OutputFile = $outFile
+        }
+
+        if ($Combine) {
+            $tempDoc = New-Object System.Xml.XmlDocument
+            $tempDoc.LoadXml($xmlContent)
+            $imported = $combinedXml.ImportNode($tempDoc.DocumentElement, $true)
+            $root.AppendChild($imported) | Out-Null
+        }
+    }
+    catch {
+        Write-Warning "  -> Failed to process '$name': $($_.Exception.Message)"
+        $results += [pscustomobject]@{
+            GPOName = $name
+            Status  = "Failed"
+            Id      = $null
+            OutputFile = $null
+        }
+    }
+}
+
+if ($Combine) {
+    $combinedPath = Join-Path $OutputFolder "CombinedGPOReports.xml"
+    $combinedXml.Save($combinedPath)
+    Write-Host "`nCombined report saved to: $combinedPath" -ForegroundColor Yellow
+}
+
+Write-Host "`n--- Summary ---" -ForegroundColor Cyan
+$results | Format-Table -AutoSize
