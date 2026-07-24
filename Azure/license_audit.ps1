@@ -1,7 +1,18 @@
 # ============================================================
-# Step 1: Connect to Microsoft Graph
+# Step 0: Strict error handling
 # ============================================================
-Connect-MgGraph -Scopes "User.Read.All","Organization.Read.All"
+$ErrorActionPreference = "Stop"
+
+Import-Module Microsoft.Graph.Users
+Import-Module Microsoft.Graph.Identity.DirectoryManagement
+
+# ============================================================
+# Step 1: Connect to Microsoft Graph (reuse session if present)
+# ============================================================
+if (-not (Get-MgContext)) {
+    Connect-MgGraph -Scopes "User.Read.All","Organization.Read.All" -UseDeviceAuthentication -NoWelcome
+}
+if (-not (Get-MgContext)) { throw "Graph connection failed." }
 
 # ============================================================
 # Step 2: Build SKU -> friendly name map (keyed by SkuPartNumber)
@@ -82,10 +93,12 @@ foreach ($User in $Users) {
 }
 
 # ============================================================
-# Step 6: Export and summarize
+# Step 6: Validate, export, summarize
 # ============================================================
+if ($Report.Count -eq 0) { throw "No licensed users returned — check connection and scopes." }
+
 $Report | Sort-Object Name | Export-Csv -Path $ExportPath -NoTypeInformation -Encoding UTF8
-Write-Host "`nLicense report exported to $ExportPath"
+Write-Host "`nLicense report exported to $ExportPath ($($Report.Count) rows)"
 
 Write-Host "`nLicense counts:"
 $LicenseCount.GetEnumerator() | Sort-Object Name |
